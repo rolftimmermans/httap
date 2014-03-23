@@ -4,7 +4,7 @@ all:
 	go build
 
 clean:
-	rm $(TARGET)
+	go clean
 
 test:
 	go test ./...

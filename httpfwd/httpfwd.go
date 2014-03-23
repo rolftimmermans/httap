@@ -5,6 +5,7 @@ import (
     "time"
     "io"
     "bufio"
+    "net"
     "net/http"
     "log"
     "os"
@@ -29,7 +30,7 @@ type Forwarder struct {
 }
 
 type ForwarderOptions struct {
-    Interface string
+    Interfaces []string
     Port int
     ReplaceHost bool
     Verbose bool
@@ -57,30 +58,20 @@ func PcapVersion() (string) {
 }
 
 func (fwd *Forwarder) Start() {
-    handle := fwd.newHandle()
-
-    packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-    packetSource.DecodeOptions = gopacket.NoCopy
-
     pool := tcpassembly.NewStreamPool(fwd)
     assembler := tcpassembly.NewAssembler(pool)
 
-    fwd.err.Printf("Wiretapping %s on port %d, forwarding to %s...\n",
-        fwd.Interface, fwd.Port, fwd.Destination)
+    packets := fwd.packets()
+    ticker := time.Tick(time.Minute)
 
     for {
-        packet, err := packetSource.NextPacket()
-        switch err {
-        default:
-            fwd.err.Fatalf("Fatal error: Cannot activate wiretap on %s\n", fwd.Interface)
-        case io.EOF: break
-        case pcap.NextErrorTimeoutExpired: continue
-        case pcap.NextErrorReadError:
-            fwd.err.Println("Error:", "Cannot read packets")
-        case nil:
+        select {
+        case packet := <- packets:
             assembler.Assemble(
                 packet.NetworkLayer().NetworkFlow(),
                 packet.TransportLayer().(*layers.TCP))
+        case <- ticker:
+            assembler.FlushOlderThan(time.Now().Add(-2 * time.Minute))
         }
     }
 }
@@ -91,18 +82,96 @@ func (fwd *Forwarder) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
     return &reader
 }
 
-func (fwd *Forwarder) newHandle() (*pcap.Handle) {
-    handle, err := pcap.OpenLive(fwd.Interface, fwd.bufsize, false, fwd.timeout)
+func (fwd *Forwarder) newSource(intf string, filter string) (*gopacket.PacketSource) {
+    handle, err := pcap.OpenLive(intf, fwd.bufsize, false, fwd.timeout)
     if err != nil {
-        panic(err)
+        fwd.err.Fatalln("Fatal error:", err)
     }
 
-    filt := fmt.Sprintf("tcp dst port %d", fwd.Port)
-    if err := handle.SetBPFFilter(filt); err != nil {
-        panic(err)
+    if err := handle.SetBPFFilter(filter); err != nil {
+        fwd.err.Fatalln("Fatal error:", err)
     }
 
-    return handle
+    source := gopacket.NewPacketSource(handle, handle.LinkType())
+    source.DecodeOptions = gopacket.NoCopy
+
+    return source
+}
+
+func (fwd *Forwarder) packets() (chan gopacket.Packet) {
+    filt := fwd.buildFilter()
+    intfs := fwd.retrieveInterfaces()
+
+    fwd.err.Printf("Wiretapping on port %d, forwarding to %s\n", fwd.Port, fwd.Destination)
+
+    if fwd.Verbose {
+        fwd.err.Printf("Listening on interfaces: %s\n", strings.Join(intfs, ", "))
+        fwd.err.Printf("Using pcap filter: \"%s\"\n", filt)
+    }
+
+    channel := make(chan gopacket.Packet, 1000)
+    for _, intf := range intfs {
+        go fwd.packetsToChannel(fwd.newSource(intf, filt), channel)
+    }
+    return channel
+}
+
+func (fwd *Forwarder) buildFilter() (string) {
+    addrs, err := net.InterfaceAddrs()
+    if err != nil {
+        fwd.err.Fatalln("Fatal error:", err)
+    }
+
+    filt := fmt.Sprintf("tcp dst port %d and (", fwd.Port)
+    for i, addr := range addrs {
+        if i > 0 {
+            filt += " or "
+        }
+        filt += fmt.Sprintf("dst host %s", addr.(*net.IPNet).IP)
+    }
+    filt += ")"
+
+    return filt
+}
+
+func (fwd* Forwarder) retrieveInterfaces() ([]string) {
+    var names []string
+
+    intfs, err := net.Interfaces()
+    if err != nil {
+        fwd.err.Fatalln("Fatal error:", err)
+    }
+
+    for _, intf := range intfs {
+        addrs, err := intf.Addrs()
+        if err != nil {
+            fwd.err.Fatalln("Fatal error:", err)
+        }
+
+        if net.FlagUp & intf.Flags == net.FlagUp && len(addrs) > 0 {
+            names = append(names, intf.Name)
+        }
+    }
+
+    return names
+}
+
+func (fwd *Forwarder) packetsToChannel(source *gopacket.PacketSource, channel chan gopacket.Packet) {
+    for {
+        packet, err := source.NextPacket()
+        switch err {
+        default:
+            fwd.err.Fatalln("Fatal error:", "Cannot activate wiretap")
+        case io.EOF:
+            close(channel)
+            return
+        case nil:
+            channel <- packet
+        case pcap.NextErrorTimeoutExpired:
+        case pcap.NextErrorReadError:
+            /* Ignore nonfatal read errors. */
+        }
+    }
 }
 
 func (fwd *Forwarder) handleStream(netFlow *gopacket.Flow, stream *tcpreader.ReaderStream) {

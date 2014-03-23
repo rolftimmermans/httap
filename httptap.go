@@ -2,27 +2,15 @@ package main
 
 import (
     "fmt"
-    "net"
     "os"
     "path"
     "github.com/ogier/pflag"
-    "github.com/rolftimmermans/httptap/httpfwd"
+    "./httpfwd"
 )
 
 var opt struct {
     httpfwd.ForwarderOptions
     Version bool
-}
-
-func firstInterface() (string, error) {
-    infs, _ := net.Interfaces()
-    for _, inf := range infs {
-        if (inf.Flags & net.FlagUp == net.FlagUp) &&
-           (inf.Flags & net.FlagLoopback == 0) {
-            return inf.Name, nil
-        }
-    }
-    return "", fmt.Errorf("no interface found")
 }
 
 func version() {
@@ -61,13 +49,10 @@ func usage() {
 }
 
 func init() {
-    intfDefault, _ := firstInterface()
-
     pflag.Usage = usage
     pflag.IntVarP(&opt.Port, "port", "p", 80, "Port to tap HTTP traffic from")
-    pflag.StringVarP(&opt.Interface, "interface", "i", intfDefault, "Network interface to listen on")
     pflag.BoolVarP(&opt.ReplaceHost, "replace-host", "h", false, "Replace value of host header with destination host")
-    pflag.BoolVarP(&opt.Verbose, "verbose", "v", false, "Output all HTTP request headers")
+    pflag.BoolVarP(&opt.Verbose, "verbose", "v", false, "Show extra information including all request headers")
     pflag.BoolVarP(&opt.Version, "version", "", false, "Show version information and exit")
 }
 
