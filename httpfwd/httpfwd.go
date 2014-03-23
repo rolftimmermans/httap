@@ -29,7 +29,6 @@ type Forwarder struct {
 }
 
 type ForwarderOptions struct {
-    Interfaces []string
     Port int
     ReplaceHost bool
     Verbose bool
