@@ -5,7 +5,6 @@ import (
     "time"
     "io"
     "bufio"
-    "net"
     "net/http"
     "log"
     "os"
@@ -82,8 +81,8 @@ func (fwd *Forwarder) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
     return &reader
 }
 
-func (fwd *Forwarder) newSource(intf string, filter string) (*gopacket.PacketSource) {
-    handle, err := pcap.OpenLive(intf, fwd.bufsize, false, fwd.timeout)
+func (fwd *Forwarder) newSource(intfName string, filter string) (*gopacket.PacketSource) {
+    handle, err := pcap.OpenLive(intfName, fwd.bufsize, false, fwd.timeout)
     if err != nil {
         fwd.err.Fatalln("Fatal error:", err)
     }
@@ -99,56 +98,52 @@ func (fwd *Forwarder) newSource(intf string, filter string) (*gopacket.PacketSou
 }
 
 func (fwd *Forwarder) packets() (chan gopacket.Packet) {
-    filt := fwd.buildFilter()
-    intfs := fwd.retrieveInterfaces()
+    intfs, err := pcap.FindAllDevs()
+    if err != nil {
+        fwd.err.Fatalln("Fatal error:", err)
+    } else if len(intfs) == 0 {
+        fwd.err.Fatalln("Fatal error:", "No interfaces found, are you root?")
+    }
+
+    filter := fwd.buildFilter(intfs)
+    intfNames := fwd.interfaceNames(intfs)
 
     fwd.err.Printf("Wiretapping on port %d, forwarding to %s\n", fwd.Port, fwd.Destination)
 
     if fwd.Verbose {
-        fwd.err.Printf("Listening on interfaces: %s\n", strings.Join(intfs, ", "))
-        fwd.err.Printf("Using pcap filter: \"%s\"\n", filt)
+        fwd.err.Printf("Listening on interfaces: %s\n", strings.Join(intfNames, ", "))
+        fwd.err.Printf("Using pcap filter: \"%s\"\n", filter)
     }
 
     channel := make(chan gopacket.Packet, 1000)
-    for _, intf := range intfs {
-        go fwd.packetsToChannel(fwd.newSource(intf, filt), channel)
+    for _, intfName := range intfNames {
+        go fwd.packetsToChannel(fwd.newSource(intfName, filter), channel)
     }
     return channel
 }
 
-func (fwd *Forwarder) buildFilter() (string) {
-    addrs, err := net.InterfaceAddrs()
-    if err != nil {
-        fwd.err.Fatalln("Fatal error:", err)
-    }
-
-    filt := fmt.Sprintf("tcp dst port %d and (", fwd.Port)
-    for i, addr := range addrs {
-        if i > 0 {
-            filt += " or "
+func (fwd *Forwarder) buildFilter(intfs []pcap.Interface) (string) {
+    filter := fmt.Sprintf("tcp dst port %d and (", fwd.Port)
+    i := 0
+    for _, intf := range intfs {
+        for _, addr := range intf.Addresses {
+            if i > 0 {
+                filter += " or "
+            }
+            filter += fmt.Sprintf("dst host %s", addr.IP)
+            i++
         }
-        filt += fmt.Sprintf("dst host %s", addr.(*net.IPNet).IP)
     }
-    filt += ")"
+    filter += ")"
 
-    return filt
+    return filter
 }
 
-func (fwd* Forwarder) retrieveInterfaces() ([]string) {
+func (fwd* Forwarder) interfaceNames(intfs []pcap.Interface) ([]string) {
     var names []string
 
-    intfs, err := net.Interfaces()
-    if err != nil {
-        fwd.err.Fatalln("Fatal error:", err)
-    }
-
     for _, intf := range intfs {
-        addrs, err := intf.Addrs()
-        if err != nil {
-            fwd.err.Fatalln("Fatal error:", err)
-        }
-
-        if net.FlagUp & intf.Flags == net.FlagUp && len(addrs) > 0 {
+        if len(intf.Addresses) > 0 {
             names = append(names, intf.Name)
         }
     }
@@ -159,17 +154,11 @@ func (fwd* Forwarder) retrieveInterfaces() ([]string) {
 func (fwd *Forwarder) packetsToChannel(source *gopacket.PacketSource, channel chan gopacket.Packet) {
     for {
         packet, err := source.NextPacket()
-        switch err {
-        default:
-            fwd.err.Fatalln("Fatal error:", "Cannot activate wiretap")
-        case io.EOF:
+        if err == io.EOF {
             close(channel)
             return
-        case nil:
+        } else if err == nil {
             channel <- packet
-        case pcap.NextErrorTimeoutExpired:
-        case pcap.NextErrorReadError:
-            /* Ignore nonfatal read errors. */
         }
     }
 }
