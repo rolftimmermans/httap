@@ -5,7 +5,7 @@ import (
     "os"
     "path"
     "github.com/ogier/pflag"
-    "./httpfwd"
+    "github.com/rolftimmermans/httptap/httpfwd"
 )
 
 var opt struct {
