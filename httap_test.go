@@ -1,9 +1,9 @@
 package main
 
 import (
-    "testing"
+	"testing"
 )
 
 func TestUsage(t *testing.T) {
-    usage()
+	usage()
 }
