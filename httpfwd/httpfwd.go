@@ -18,17 +18,15 @@ import (
 )
 
 type Forwarder struct {
-	Sources, Destinations AddrList
-
-	Interfaces []string
-	Headers    map[string]string
-
-	Log     *log.Logger
-	Verbose bool
-	Bufsize int32
-	Timeout time.Duration
-
-	transport http.Transport
+	Sources      AddrList
+	Destinations AddrList
+	Interfaces   []string
+	Headers      map[string]string
+	Log          *log.Logger
+	Verbose      bool
+	Bufsize      int32
+	Timeout      time.Duration
+	transport    http.Transport
 }
 
 type Options struct {
@@ -58,15 +56,12 @@ func NewForwarder(opts Options) *Forwarder {
 	return &Forwarder{
 		Sources:      sources,
 		Destinations: destinations,
-
-		Interfaces: FindInterfaces(),
-		Headers:    headers,
-
-		Log:     log.New(os.Stdout, "", log.LstdFlags),
-		Verbose: opts.Verbose,
-		Bufsize: 65535,
-		Timeout: 10 * time.Millisecond,
-
+		Interfaces:   FindInterfaces(),
+		Headers:      headers,
+		Log:          log.New(os.Stdout, "", log.LstdFlags),
+		Verbose:      opts.Verbose,
+		Bufsize:      65535,
+		Timeout:      10 * time.Millisecond,
 		transport: http.Transport{
 			MaxIdleConnsPerHost: 6,
 		},
@@ -116,7 +111,7 @@ func (fwd *Forwarder) packets() chan gopacket.Packet {
 }
 
 func (fwd *Forwarder) newSource(intf string, filter string) *gopacket.PacketSource {
-	handle, err := pcap.OpenLive(intf, fwd.Bufsize, false, fwd.Timeout)
+	handle, err := pcap.OpenLive(intf, fwd.Bufsize, fwd.Sources.RequiresPromiscuous(), fwd.Timeout)
 	if err != nil {
 		panic(err)
 	}

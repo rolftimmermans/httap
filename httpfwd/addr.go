@@ -102,6 +102,24 @@ func (addrs AddrList) Filter() string {
 	return filter
 }
 
+func (addrs AddrList) RequiresPromiscuous() bool {
+	ips, err := net.InterfaceAddrs()
+	if err != nil {
+		return true
+	}
+
+Addrs:
+	for _, addr := range addrs {
+		for _, ip := range ips {
+			if reflect.DeepEqual(addr.IP, ip.(*net.IPNet).IP) {
+				continue Addrs
+			}
+		}
+		return true
+	}
+	return false
+}
+
 func (e *AddrError) Error() string {
 	return fmt.Sprintf("cannot resolve %s (%s)", e.str, e.err)
 }
