@@ -23,27 +23,27 @@ func TestAddrString(t *testing.T) {
 	assert.Equal(t, addrs.String(), "127.0.0.1:80, [::1]:80")
 }
 
-func TestRequiresPromiscuous(t *testing.T) {
+func TestRequiresPromisc(t *testing.T) {
 	var addrs AddrList
 
 	addrs = AddrList{
 		&net.TCPAddr{IP: net.IPv6loopback, Port: 80},
 		&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 80},
 	}
-	assert.Equal(t, addrs.RequiresPromiscuous(), false)
+	assert.Equal(t, addrs.RequiresPromisc(), false)
 
 	addrs = AddrList{
 		&net.TCPAddr{IP: net.IPv6loopback, Port: 80},
 		&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 80},
 		&net.TCPAddr{IP: net.IPv4(8, 8, 4, 4), Port: 80},
 	}
-	assert.Equal(t, addrs.RequiresPromiscuous(), true)
+	assert.Equal(t, addrs.RequiresPromisc(), true)
 
 	addrs = AddrList{
 		&net.TCPAddr{IP: net.IPv4(8, 8, 8, 8), Port: 80},
 		&net.TCPAddr{IP: net.IPv4(8, 8, 4, 4), Port: 80},
 	}
-	assert.Equal(t, addrs.RequiresPromiscuous(), true)
+	assert.Equal(t, addrs.RequiresPromisc(), true)
 }
 
 func TestResolveAddrPatternsDomains(t *testing.T) {

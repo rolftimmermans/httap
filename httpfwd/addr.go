@@ -99,7 +99,7 @@ func (addrs AddrList) Filter() string {
 	return strings.Join(parts, " or ")
 }
 
-func (addrs AddrList) RequiresPromiscuous() bool {
+func (addrs AddrList) RequiresPromisc() bool {
 	ips, err := net.InterfaceAddrs()
 	if err != nil {
 		return true

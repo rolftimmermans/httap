@@ -111,7 +111,7 @@ func (fwd *Forwarder) packets() chan gopacket.Packet {
 }
 
 func (fwd *Forwarder) newSource(intf string, filter string) *gopacket.PacketSource {
-	handle, err := pcap.OpenLive(intf, fwd.Bufsize, fwd.Sources.RequiresPromiscuous(), fwd.Timeout)
+	handle, err := pcap.OpenLive(intf, fwd.Bufsize, fwd.Sources.RequiresPromisc(), fwd.Timeout)
 	if err != nil {
 		panic(err)
 	}
