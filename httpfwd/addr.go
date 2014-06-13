@@ -17,7 +17,7 @@ type AddrError struct {
 func FindInterfaces() []string {
 	var intfsWithAddress []string
 
-	intfs, err := net.Interfaces() //pcap.FindAllDevs()
+	intfs, err := net.Interfaces()
 	if err != nil {
 		return []string{}
 	}
@@ -92,14 +92,11 @@ func (addrs AddrList) String() string {
 }
 
 func (addrs AddrList) Filter() string {
-	var filter string
-	for i, addr := range addrs {
-		if i > 0 {
-			filter += " or "
-		}
-		filter += fmt.Sprintf("(dst host %s and tcp dst port %d)", addr.IP, addr.Port)
+	var parts []string
+	for _, addr := range addrs {
+		parts = append(parts, fmt.Sprintf("(dst host %s and tcp dst port %d)", addr.IP, addr.Port))
 	}
-	return filter
+	return strings.Join(parts, " or ")
 }
 
 func (addrs AddrList) RequiresPromiscuous() bool {
