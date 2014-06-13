@@ -4,8 +4,7 @@ LIBPCAP = vendor/libpcap
 all: export CGO_CFLAGS  = -I$(realpath $(LIBPCAP))
 all: export CGO_LDFLAGS = -L$(realpath $(LIBPCAP))
 all: $(LIBPCAP)/libpcap.a
-	go build -a code.google.com/p/gopacket
-	go build
+	go build -a
 
 clean:
 	go clean

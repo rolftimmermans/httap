@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/rolftimmermans/httap/httpfwd"
@@ -24,7 +25,7 @@ var parser *flags.Parser
 func writeVersion() {
 	cliName := path.Base(os.Args[0])
 	cliVersion := "0.1"
-	fmt.Fprintf(os.Stderr, "%s version %s (%s)\n", cliName, cliVersion, httpfwd.PcapVersion())
+	fmt.Fprintf(os.Stderr, "%s version %s (%s, %s)\n", cliName, cliVersion, httpfwd.PcapVersion(), runtime.Version())
 }
 
 func writeHelp() {
