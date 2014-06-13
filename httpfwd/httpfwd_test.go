@@ -3,14 +3,14 @@ package httpfwd
 import (
 	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"net"
 	"time"
 
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
 	"code.google.com/p/gopacket/tcpassembly"
 	"code.google.com/p/gopacket/tcpassembly/tcpreader"
-	"net"
-	"net/http"
 )
 
 type testReaderFactory struct {
@@ -25,15 +25,14 @@ func (fwd *testReaderFactory) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.St
 }
 
 func TestNewForwarder(t *testing.T) {
-	fwd := NewForwarder("lo0", ForwarderOptions{})
+	fwd := NewForwarder(Options{})
 
 	assert.NotNil(t, fwd)
 
-	assert.Equal(t, fwd.bufsize, 65535)
-	assert.Equal(t, fwd.timeout, time.Second/100)
+	assert.Equal(t, fwd.Bufsize, 65535)
+	assert.Equal(t, fwd.Timeout, time.Second/100)
 
-	assert.NotNil(t, fwd.req)
-	assert.NotNil(t, fwd.err)
+	assert.NotNil(t, fwd.Log)
 }
 
 func TestPcapVersion(t *testing.T) {
@@ -46,7 +45,7 @@ func TestHandleStream(t *testing.T) {
 		layers.NewIPEndpoint(net.IP{5, 6, 7, 8}))
 
 	readerFactory := &testReaderFactory{
-		Forwarder:    *NewForwarder("lo0", ForwarderOptions{}),
+		Forwarder:    *NewForwarder(Options{}),
 		ReaderStream: tcpreader.NewReaderStream(),
 	}
 
