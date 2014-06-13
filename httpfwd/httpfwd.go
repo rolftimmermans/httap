@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -19,7 +18,7 @@ import (
 )
 
 type Forwarder struct {
-	Sources, Destinations []*net.TCPAddr
+	Sources, Destinations AddrList
 
 	Interfaces []string
 	Headers    map[string]string
@@ -40,12 +39,12 @@ type Options struct {
 }
 
 func NewForwarder(opts Options) *Forwarder {
-	sources, err := resolveAddrPatterns(opts.Sources)
+	sources, err := ResolveAddrPatterns(opts.Sources)
 	if err != nil {
 		panic(err)
 	}
 
-	destinations, err := resolveAddrPatterns(opts.Destinations)
+	destinations, err := ResolveAddrPatterns(opts.Destinations)
 	if err != nil {
 		panic(err)
 	}
@@ -60,7 +59,7 @@ func NewForwarder(opts Options) *Forwarder {
 		Sources:      sources,
 		Destinations: destinations,
 
-		Interfaces: findInterfaces(),
+		Interfaces: FindInterfaces(),
 		Headers:    headers,
 
 		Log:     log.New(os.Stdout, "", log.LstdFlags),
@@ -85,10 +84,10 @@ func (fwd *Forwarder) Start() {
 	packets := fwd.packets()
 
 	if fwd.Verbose {
-		fmt.Fprintln(os.Stderr, "Listening on interfaces", strList(fwd.Interfaces))
+		fmt.Fprintf(os.Stderr, "Listening on interfaces %s\n", strings.Join(fwd.Interfaces, ", "))
 	}
 
-	fmt.Fprintln(os.Stderr, "Wiretapping HTTP traffic to", addrList(fwd.Sources), "and forwarding to", addrList(fwd.Destinations)+"...")
+	fmt.Fprintf(os.Stderr, "Wiretapping HTTP traffic to %s and forwarding to %s...\n", fwd.Sources, fwd.Destinations)
 
 	for {
 		select {
@@ -111,7 +110,7 @@ func (fwd *Forwarder) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
 func (fwd *Forwarder) packets() chan gopacket.Packet {
 	channel := make(chan gopacket.Packet, 1000)
 	for _, intf := range fwd.Interfaces {
-		go fwd.packetsToChannel(fwd.newSource(intf, addrFilter(fwd.Sources)), channel)
+		go fwd.packetsToChannel(fwd.newSource(intf, fwd.Sources.Filter()), channel)
 	}
 	return channel
 }

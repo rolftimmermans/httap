@@ -7,16 +7,14 @@ import (
 	"strings"
 )
 
-type addrError struct {
+type AddrList []*net.TCPAddr
+
+type AddrError struct {
 	str string
 	err error
 }
 
-func (e *addrError) Error() string {
-	return fmt.Sprintf("cannot resolve %s (%s)", e.str, e.err)
-}
-
-func findInterfaces() []string {
+func FindInterfaces() []string {
 	var intfsWithAddress []string
 
 	intfs, err := net.Interfaces() //pcap.FindAllDevs()
@@ -34,7 +32,66 @@ func findInterfaces() []string {
 	return intfsWithAddress
 }
 
-func addrFilter(addrs []*net.TCPAddr) string {
+func ResolveAddrPatterns(strs []string) (AddrList, error) {
+	var addrs AddrList
+
+	for _, str := range strs {
+		if !hasPort(str) {
+			str = str + ":80"
+		}
+
+		host, port, err := net.SplitHostPort(str)
+		if err != nil {
+			return nil, &AddrError{str, err}
+		}
+
+		if host == "*" {
+			ips, err := net.InterfaceAddrs()
+			if err != nil {
+				return nil, &AddrError{str, err}
+			}
+
+			for _, ip := range ips {
+				addr, err := resolveAddr(ip.(*net.IPNet).IP.String(), port)
+				if err != nil {
+					return nil, &AddrError{str, err}
+				}
+				addrs = addrs.Add(addr)
+			}
+		} else {
+			addr, err := resolveAddr(host, port)
+			if err != nil {
+				return nil, &AddrError{str, err}
+			}
+			addrs = addrs.Add(addr)
+		}
+	}
+
+	return addrs, nil
+}
+
+func (addrs AddrList) Add(new *net.TCPAddr) AddrList {
+	for _, item := range addrs {
+		if reflect.DeepEqual(new, item) {
+			return addrs
+		}
+	}
+	return append(addrs, new)
+}
+
+func (addrs AddrList) String() string {
+	var ipv4Addrs, ipv6Addrs []string
+	for _, addr := range addrs {
+		if p4 := addr.IP.To4(); len(p4) == net.IPv4len {
+			ipv4Addrs = append(ipv4Addrs, addr.String())
+		} else {
+			ipv6Addrs = append(ipv6Addrs, addr.String())
+		}
+	}
+	return strings.Join(append(ipv4Addrs, ipv6Addrs...), ", ")
+}
+
+func (addrs AddrList) Filter() string {
 	var filter string
 	for i, addr := range addrs {
 		if i > 0 {
@@ -45,71 +102,12 @@ func addrFilter(addrs []*net.TCPAddr) string {
 	return filter
 }
 
-func addrList(addrs []*net.TCPAddr) string {
-	var ipv4Addrs, ipv6Addrs []string
-	for _, addr := range addrs {
-		if p4 := addr.IP.To4(); len(p4) == net.IPv4len {
-			ipv4Addrs = append(ipv4Addrs, addr.String())
-		} else {
-			ipv6Addrs = append(ipv6Addrs, addr.String())
-		}
-	}
-	return strList(append(ipv4Addrs, ipv6Addrs...))
-}
-
-func strList(strs []string) string {
-	return strings.Join(strs, ", ")
-}
-
-func resolveAddrPatterns(strs []string) ([]*net.TCPAddr, error) {
-	var addrs []*net.TCPAddr
-
-	for _, str := range strs {
-		if !hasPort(str) {
-			str = str + ":80"
-		}
-
-		host, port, err := net.SplitHostPort(str)
-		if err != nil {
-			return nil, &addrError{str, err}
-		}
-
-		if host == "*" {
-			ips, err := net.InterfaceAddrs()
-			if err != nil {
-				return nil, &addrError{str, err}
-			}
-
-			for _, ip := range ips {
-				addr, err := resolveAddr(ip.(*net.IPNet).IP.String(), port)
-				if err != nil {
-					return nil, &addrError{str, err}
-				}
-				addrs = appendUnique(addrs, addr)
-			}
-		} else {
-			addr, err := resolveAddr(host, port)
-			if err != nil {
-				return nil, &addrError{str, err}
-			}
-			addrs = appendUnique(addrs, addr)
-		}
-	}
-
-	return addrs, nil
+func (e *AddrError) Error() string {
+	return fmt.Sprintf("cannot resolve %s (%s)", e.str, e.err)
 }
 
 func hasPort(s string) bool {
 	return strings.LastIndex(s, ":") > strings.LastIndex(s, "]")
-}
-
-func appendUnique(list []*net.TCPAddr, new *net.TCPAddr) []*net.TCPAddr {
-	for _, item := range list {
-		if reflect.DeepEqual(new, item) {
-			return list
-		}
-	}
-	return append(list, new)
 }
 
 func resolveAddr(host, port string) (*net.TCPAddr, error) {
