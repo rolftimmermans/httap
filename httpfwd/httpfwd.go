@@ -179,6 +179,8 @@ func (fwd *Forwarder) forwardRequest(netFlow *gopacket.Flow, req *http.Request, 
 
 	for _, dst := range fwd.Destinations {
 		dst := *dst
+
+		/* If the destination IP is unset, use the original destination IP. */
 		if dst.IP == nil {
 			dst.IP = net.ParseIP(netFlow.Dst().String())
 		}
