@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -44,7 +45,7 @@ func NewForwarder(opts Options) *Forwarder {
 		panic(err)
 	}
 
-	destinations, err := ResolveAddrPatterns(opts.Destinations)
+	destinations, err := ResolveAddrList(opts.Destinations)
 	if err != nil {
 		panic(err)
 	}
@@ -160,9 +161,6 @@ func (fwd *Forwarder) forwardRequest(netFlow *gopacket.Flow, req *http.Request, 
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
 
-	originalPeer := netFlow.Src().String()
-	originalURL := req.URL.String()
-
 	for key, value := range fwd.Headers {
 		if value == "" {
 			req.Header.Del(key)
@@ -180,21 +178,27 @@ func (fwd *Forwarder) forwardRequest(netFlow *gopacket.Flow, req *http.Request, 
 	}
 
 	for _, dst := range fwd.Destinations {
+		dst := *dst
+		if dst.IP == nil {
+			dst.IP = net.ParseIP(netFlow.Dst().String())
+		}
+
 		copy := copyRequest(req)
 		copy.URL.Host = dst.String()
 		copy.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
-		go fwd.sendRequest(copy, originalPeer, originalURL)
+
+		go fwd.sendRequest(copy, netFlow.Src().String(), req.URL.String())
 	}
 }
 
-func (fwd *Forwarder) sendRequest(req *http.Request, originalPeer, originalURL string) {
+func (fwd *Forwarder) sendRequest(req *http.Request, origSrc, origURL string) {
 	res, err := fwd.Transport.RoundTrip(req)
 	if err != nil {
 		fwd.Log.Println("Error:", err)
 	} else {
 		/* "The client must close the response body when finished with it." */
 		defer res.Body.Close()
-		fwd.Log.Printf("%s %s %s (%s) %d\n", originalPeer, req.Method, originalURL, req.URL.Host, res.StatusCode)
+		fwd.Log.Printf("%s %s %s (%s) %d\n", origSrc, req.Method, origURL, req.URL.Host, res.StatusCode)
 		if fwd.Verbose {
 			req.Body = nil
 			req.Write(os.Stdout)

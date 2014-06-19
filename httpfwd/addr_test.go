@@ -104,7 +104,25 @@ func TestResolveAddrPatternsWildcard(t *testing.T) {
 	assert.Equal(t, *(addrs[0]), net.TCPAddr{IP: net.IPv6loopback, Port: 80})
 	assert.Equal(t, *(addrs[1]), net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 80})
 
+
 	addrs, _ = ResolveAddrPatterns([]string{"*:80"})
 	assert.Equal(t, *(addrs[0]), net.TCPAddr{IP: net.IPv6loopback, Port: 80})
 	assert.Equal(t, *(addrs[1]), net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 80})
+
+	addrs, _ = ResolveAddrPatterns([]string{":80"})
+	assert.Equal(t, *(addrs[0]), net.TCPAddr{IP: net.IPv6loopback, Port: 80})
+	assert.Equal(t, *(addrs[1]), net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 80})
+}
+
+func TestResolveAddrListWildcard(t *testing.T) {
+	var addrs AddrList
+
+	addrs, _ = ResolveAddrList([]string{"*"})
+	assert.Equal(t, *(addrs[0]), net.TCPAddr{IP: net.IP(nil), Port: 80})
+
+	addrs, _ = ResolveAddrList([]string{"*:80"})
+	assert.Equal(t, *(addrs[0]), net.TCPAddr{IP: net.IP(nil), Port: 80})
+
+	addrs, _ = ResolveAddrList([]string{":80"})
+	assert.Equal(t, *(addrs[0]), net.TCPAddr{IP: net.IP(nil), Port: 80})
 }

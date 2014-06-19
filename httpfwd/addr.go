@@ -32,7 +32,15 @@ func FindInterfaces() []string {
 	return intfsWithAddress
 }
 
+func ResolveAddrList(strs []string) (AddrList, error) {
+	return resolveAddrListOrPatterns(strs, false)
+}
+
 func ResolveAddrPatterns(strs []string) (AddrList, error) {
+	return resolveAddrListOrPatterns(strs, true)
+}
+
+func resolveAddrListOrPatterns(strs []string, expand bool) (AddrList, error) {
 	var addrs AddrList
 
 	for _, str := range strs {
@@ -46,6 +54,10 @@ func ResolveAddrPatterns(strs []string) (AddrList, error) {
 		}
 
 		if host == "*" {
+			host = ""
+		}
+
+		if expand && host == "" {
 			ips, err := net.InterfaceAddrs()
 			if err != nil {
 				return nil, &AddrError{str, err}
