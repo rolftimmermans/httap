@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	// "io/ioutil"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -111,9 +111,9 @@ func (fwd *Forwarder) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
 				fwd.Log.Println("Error:", err)
 			} else {
 				body := new(bytes.Buffer)
-				// if _, err := io.Copy(body, req.Body); err != nil {
-				// 	fwd.Log.Println("Error:", err)
-				// }
+				if _, err := io.Copy(body, req.Body); err != nil {
+					fwd.Log.Println("Error:", err)
+				}
 				go fwd.forwardRequest(&netFlow, req, body)
 			}
 		}
@@ -182,7 +182,7 @@ func (fwd *Forwarder) forwardRequest(netFlow *gopacket.Flow, req *http.Request, 
 	for _, dst := range fwd.Destinations {
 		copy := copyRequest(req)
 		copy.URL.Host = dst.String()
-		// copy.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
+		copy.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
 		go fwd.sendRequest(copy, originalPeer, originalURL)
 	}
 }
