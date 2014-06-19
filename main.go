@@ -10,14 +10,10 @@ import (
 	"github.com/rolftimmermans/httap/httpfwd"
 )
 
-type Flags struct {
+type options struct {
 	httpfwd.Options
 	Help    bool `long:"help"    description:"Display this help and exit"`
 	Version bool `long:"version" description:"Display version number and exit"`
-}
-
-var opts struct {
-	Flags `group:"Options"`
 }
 
 var parser *flags.Parser
@@ -41,7 +37,15 @@ func reportError() {
 }
 
 func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+}
+
+func main() {
 	defer reportError()
+
+	var opts struct {
+		options `group:"Options"`
+	}
 
 	parser = flags.NewParser(&opts, flags.None)
 	parser.Usage = "[OPTIONS] [--src HOST:PORT ...] --dst HOST:PORT ..."
@@ -51,18 +55,12 @@ func init() {
 		opts.Help = true
 	}
 
-	if err != nil && !opts.Help && !opts.Version {
-		panic(err)
-	}
-}
-
-func main() {
-	defer reportError()
-
 	if opts.Version {
 		writeVersion()
 	} else if opts.Help {
 		writeHelp()
+	} else if err != nil {
+		panic(err)
 	} else {
 		httpfwd.NewForwarder(opts.Options).Start()
 	}

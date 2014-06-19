@@ -15,7 +15,8 @@ distclean:
 	rm -rf $(LIBPCAP)
 
 test:
-	go test ./...
+	@sudo echo -n
+	go test -parallel 20 -exec sudo ./...
 
 $(LIBPCAP)/libpcap.a: $(LIBPCAP)/configure
 	cd $(LIBPCAP) && ./configure --disable-shared --quiet

@@ -2,8 +2,10 @@ package httpfwd
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
+	// "io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -26,7 +28,7 @@ type Forwarder struct {
 	Verbose      bool
 	Bufsize      int32
 	Timeout      time.Duration
-	transport    http.Transport
+	Transport    http.Transport
 }
 
 type Options struct {
@@ -62,9 +64,7 @@ func NewForwarder(opts Options) *Forwarder {
 		Verbose:      opts.Verbose,
 		Bufsize:      65535,
 		Timeout:      10 * time.Millisecond,
-		transport: http.Transport{
-			MaxIdleConnsPerHost: 6,
-		},
+		Transport:    http.Transport{MaxIdleConnsPerHost: 6},
 	}
 }
 
@@ -75,8 +75,9 @@ func PcapVersion() string {
 func (fwd *Forwarder) Start() {
 	pool := tcpassembly.NewStreamPool(fwd)
 	assembler := tcpassembly.NewAssembler(pool)
+
+	packets := fwd.wiretap()
 	ticker := time.Tick(time.Minute)
-	packets := fwd.packets()
 
 	if fwd.Verbose {
 		fmt.Fprintf(os.Stderr, "Listening on interfaces %s\n", strings.Join(fwd.Interfaces, ", "))
@@ -97,62 +98,65 @@ func (fwd *Forwarder) Start() {
 }
 
 func (fwd *Forwarder) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
-	reader := tcpreader.NewReaderStream()
-	go fwd.handleStream(&netFlow, &reader)
-	return &reader
+	stream := tcpreader.NewReaderStream()
+
+	go func() {
+		buf := bufio.NewReader(&stream)
+
+		for {
+			req, err := http.ReadRequest(buf)
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				fwd.Log.Println("Error:", err)
+			} else {
+				body := new(bytes.Buffer)
+				// if _, err := io.Copy(body, req.Body); err != nil {
+				// 	fwd.Log.Println("Error:", err)
+				// }
+				go fwd.forwardRequest(&netFlow, req, body)
+			}
+		}
+	}()
+
+	return &stream
 }
 
-func (fwd *Forwarder) packets() chan gopacket.Packet {
-	channel := make(chan gopacket.Packet, 1000)
+func (fwd *Forwarder) wiretap() chan gopacket.Packet {
+	channel := make(chan gopacket.Packet, 100)
+	filter := fwd.Sources.Filter()
+
 	for _, intf := range fwd.Interfaces {
-		go fwd.packetsToChannel(fwd.newSource(intf, fwd.Sources.Filter()), channel)
+		handle, err := pcap.OpenLive(intf, fwd.Bufsize, fwd.Sources.RequiresPromisc(), fwd.Timeout)
+		if err != nil {
+			panic(err)
+		}
+
+		if err := handle.SetBPFFilter(filter); err != nil {
+			panic(err)
+		}
+
+		go func(handle *pcap.Handle) {
+			defer handle.Close()
+
+			src := gopacket.NewPacketSource(handle, handle.LinkType())
+			src.DecodeOptions = gopacket.NoCopy
+
+			for {
+				packet, err := src.NextPacket()
+				if err == io.EOF {
+					return
+				} else if err == nil {
+					channel <- packet
+				}
+			}
+		}(handle)
 	}
+
 	return channel
 }
 
-func (fwd *Forwarder) newSource(intf string, filter string) *gopacket.PacketSource {
-	handle, err := pcap.OpenLive(intf, fwd.Bufsize, fwd.Sources.RequiresPromisc(), fwd.Timeout)
-	if err != nil {
-		panic(err)
-	}
-
-	if err := handle.SetBPFFilter(filter); err != nil {
-		panic(err)
-	}
-
-	source := gopacket.NewPacketSource(handle, handle.LinkType())
-	source.DecodeOptions = gopacket.NoCopy
-
-	return source
-}
-
-func (fwd *Forwarder) packetsToChannel(source *gopacket.PacketSource, channel chan gopacket.Packet) {
-	for {
-		packet, err := source.NextPacket()
-		if err == io.EOF {
-			close(channel)
-			return
-		} else if err == nil {
-			channel <- packet
-		}
-	}
-}
-
-func (fwd *Forwarder) handleStream(netFlow *gopacket.Flow, stream *tcpreader.ReaderStream) {
-	buf := bufio.NewReader(stream)
-	for {
-		req, err := http.ReadRequest(buf)
-		if err == io.EOF {
-			return
-		} else if err != nil {
-			fwd.Log.Println("Error:", err)
-		} else {
-			go fwd.forwardRequest(netFlow, req)
-		}
-	}
-}
-
-func (fwd *Forwarder) forwardRequest(netFlow *gopacket.Flow, req *http.Request) {
+func (fwd *Forwarder) forwardRequest(netFlow *gopacket.Flow, req *http.Request, body *bytes.Buffer) {
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
 
@@ -178,12 +182,13 @@ func (fwd *Forwarder) forwardRequest(netFlow *gopacket.Flow, req *http.Request) 
 	for _, dst := range fwd.Destinations {
 		copy := copyRequest(req)
 		copy.URL.Host = dst.String()
+		// copy.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
 		go fwd.sendRequest(copy, originalPeer, originalURL)
 	}
 }
 
 func (fwd *Forwarder) sendRequest(req *http.Request, originalPeer, originalURL string) {
-	res, err := fwd.transport.RoundTrip(req)
+	res, err := fwd.Transport.RoundTrip(req)
 	if err != nil {
 		fwd.Log.Println("Error:", err)
 	} else {
