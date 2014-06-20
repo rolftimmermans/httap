@@ -1,4 +1,4 @@
-package httpfwd
+package httap
 
 import (
 	"fmt"

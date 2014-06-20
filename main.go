@@ -7,11 +7,11 @@ import (
 	"runtime"
 
 	"github.com/jessevdk/go-flags"
-	"github.com/rolftimmermans/httap/httpfwd"
+	httap "github.com/rolftimmermans/httap/lib"
 )
 
 type options struct {
-	httpfwd.Options
+	httap.Options
 	Help    bool `long:"help"    description:"Display this help and exit"`
 	Version bool `long:"version" description:"Display version number and exit"`
 }
@@ -21,7 +21,7 @@ var parser *flags.Parser
 func writeVersion() {
 	cliName := path.Base(os.Args[0])
 	cliVersion := "0.1"
-	fmt.Fprintf(os.Stderr, "%s version %s (%s, %s)\n", cliName, cliVersion, httpfwd.PcapVersion(), runtime.Version())
+	fmt.Fprintf(os.Stderr, "%s version %s (%s, %s)\n", cliName, cliVersion, httap.PcapVersion(), runtime.Version())
 }
 
 func writeHelp() {
@@ -62,6 +62,6 @@ func main() {
 	} else if err != nil {
 		panic(err)
 	} else {
-		httpfwd.NewForwarder(opts.Options).Start()
+		httap.NewForwarder(opts.Options).Start()
 	}
 }
