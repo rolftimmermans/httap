@@ -44,17 +44,9 @@ func resolveAddrListOrPatterns(strs []string, expand bool) (AddrList, error) {
 	var addrs AddrList
 
 	for _, str := range strs {
-		if !hasPort(str) {
-			str = str + ":80"
-		}
-
-		host, port, err := net.SplitHostPort(str)
+		host, port, err := splitAddr(str)
 		if err != nil {
 			return nil, &AddrError{str, err}
-		}
-
-		if host == "*" {
-			host = ""
 		}
 
 		if expand && host == "" {
@@ -64,14 +56,14 @@ func resolveAddrListOrPatterns(strs []string, expand bool) (AddrList, error) {
 			}
 
 			for _, ip := range ips {
-				addr, err := resolveAddr(ip.(*net.IPNet).IP.String(), port)
+				addr, err := resolveHostPort(ip.(*net.IPNet).IP.String(), port)
 				if err != nil {
 					return nil, &AddrError{str, err}
 				}
 				addrs = addrs.Add(addr)
 			}
 		} else {
-			addr, err := resolveAddr(host, port)
+			addr, err := resolveHostPort(host, port)
 			if err != nil {
 				return nil, &AddrError{str, err}
 			}
@@ -133,10 +125,27 @@ func (e *AddrError) Error() string {
 	return fmt.Sprintf("cannot resolve %s (%s)", e.str, e.err)
 }
 
-func hasPort(s string) bool {
-	return strings.LastIndex(s, ":") > strings.LastIndex(s, "]")
+func splitAddr(addr string) (string, string, error) {
+	if !hasPort(addr) {
+		addr = addr + ":80"
+	}
+
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", "", err
+	}
+
+	if host == "*" {
+		host = ""
+	}
+
+	return host, port, nil
 }
 
-func resolveAddr(host, port string) (*net.TCPAddr, error) {
+func hasPort(addr string) bool {
+	return strings.LastIndex(addr, ":") > strings.LastIndex(addr, "]")
+}
+
+func resolveHostPort(host, port string) (*net.TCPAddr, error) {
 	return net.ResolveTCPAddr("tcp", net.JoinHostPort(host, port))
 }

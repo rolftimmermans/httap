@@ -16,15 +16,15 @@ type requestInfo struct {
 	consumedBody []byte
 }
 
-func TestNewForwarderOptions(t *testing.T) {
-	fwd := NewForwarder(Options{})
+func TestNewWiretapOptions(t *testing.T) {
+	tap := NewWiretap(Options{})
 
-	assert.NotNil(t, fwd)
+	assert.NotNil(t, tap)
 
-	assert.Equal(t, fwd.Bufsize, 65535)
-	assert.Equal(t, fwd.Timeout, time.Second/100)
+	assert.Equal(t, tap.Bufsize, 65535)
+	assert.Equal(t, tap.Timeout, time.Second/100)
 
-	assert.NotNil(t, fwd.Log)
+	assert.NotNil(t, tap.Log)
 }
 
 func TestPcapVersion(t *testing.T) {
@@ -102,11 +102,11 @@ func performHttpWiretap(opts Options, callback func(string)) (requestInfo, reque
 
 	opts.Sources = []string{prdHost}
 	opts.Destinations = []string{tstHost}
-	forwarder := NewForwarder(opts)
+	wiretap := NewWiretap(opts)
 
-	go forwarder.Start()
+	go wiretap.Start()
 
-	/* Sleep to allow forwarder to start up before issuing request. */
+	/* Sleep to allow wiretap to start up before issuing request. */
 	time.Sleep(50 * time.Millisecond)
 	go callback("http://" + prdHost)
 

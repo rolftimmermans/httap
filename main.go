@@ -62,6 +62,6 @@ func main() {
 	} else if err != nil {
 		panic(err)
 	} else {
-		httap.NewForwarder(opts.Options).Start()
+		httap.NewWiretap(opts.Options).Start()
 	}
 }
