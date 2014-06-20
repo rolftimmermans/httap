@@ -20,9 +20,9 @@ type Wiretap struct {
 	Destinations AddrList
 	Interfaces   []string
 	Headers      map[string]string
-	Log          *log.Logger
+	Logger       *log.Logger
 	Verbose      bool
-	Bufsize      int32
+	BufSize      int32
 	Timeout      time.Duration
 	Transport    http.Transport
 }
@@ -56,11 +56,11 @@ func NewWiretap(opts Options) *Wiretap {
 		Destinations: destinations,
 		Interfaces:   FindInterfaces(),
 		Headers:      headers,
-		Log:          log.New(os.Stdout, "", log.LstdFlags),
+		Logger:       log.New(os.Stdout, "", log.LstdFlags),
 		Verbose:      opts.Verbose,
-		Bufsize:      65535,
+		BufSize:      65535,
 		Timeout:      10 * time.Millisecond,
-		Transport:    http.Transport{MaxIdleConnsPerHost: 6},
+		Transport:    http.Transport{MaxIdleConnsPerHost: 16},
 	}
 }
 
@@ -99,12 +99,16 @@ func (tap *Wiretap) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
 	return stream
 }
 
+func (tap *Wiretap) Log(fmt string, args ...interface{}) {
+	tap.Logger.Printf(fmt+"\n", args...)
+}
+
 func (tap *Wiretap) packets() chan gopacket.Packet {
 	channel := make(chan gopacket.Packet, 100)
 	filter := tap.Sources.Filter()
 
 	for _, intf := range tap.Interfaces {
-		handle, err := pcap.OpenLive(intf, tap.Bufsize, tap.Sources.RequiresPromisc(), tap.Timeout)
+		handle, err := pcap.OpenLive(intf, tap.BufSize, tap.Sources.RequiresPromisc(), tap.Timeout)
 		if err != nil {
 			panic(err)
 		}

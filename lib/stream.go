@@ -31,11 +31,11 @@ func (st *Stream) Consume() {
 	buf := bufio.NewReader(st)
 
 	for {
-		req, err := http.ReadRequest(buf)
+		req, err := http.ReadRequest(st)
 		if err == io.EOF {
 			return
 		} else if err != nil {
-			st.tap.Log.Println("Error:", err)
+			st.tap.Log("Error: %s", err)
 		} else {
 			st.forward(req)
 		}
@@ -48,7 +48,7 @@ func (st *Stream) forward(req *http.Request) {
 
 	body := new(bytes.Buffer)
 	if _, err := io.Copy(body, req.Body); err != nil {
-		st.tap.Log.Println("Error:", err)
+		st.tap.Log("Error: %s", err)
 	}
 
 	for key, value := range st.tap.Headers {
@@ -75,11 +75,11 @@ func (st *Stream) forward(req *http.Request) {
 func (st *Stream) send(req *http.Request, url string) {
 	res, err := st.tap.Transport.RoundTrip(req)
 	if err != nil {
-		st.tap.Log.Println("Error:", err)
+		st.tap.Log("Error: %s", err)
 	} else {
 		/* "The client must close the response body when finished with it." */
 		defer res.Body.Close()
-		st.tap.Log.Printf("%s %s %s (%s) %d\n", st.flow.Src().String(), req.Method, url, req.URL.Host, res.StatusCode)
+		st.tap.Log("%s %s %s (%s) %d", st.flow.Src().String(), req.Method, url, req.URL.Host, res.StatusCode)
 		if st.tap.Verbose {
 			req.Body = nil
 			req.Write(os.Stdout)

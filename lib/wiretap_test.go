@@ -21,7 +21,7 @@ func TestNewWiretapOptions(t *testing.T) {
 
 	assert.NotNil(t, tap)
 
-	assert.Equal(t, tap.Bufsize, 65535)
+	assert.Equal(t, tap.BufSize, 65535)
 	assert.Equal(t, tap.Timeout, time.Second/100)
 
 	assert.NotNil(t, tap.Log)

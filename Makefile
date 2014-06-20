@@ -16,6 +16,7 @@ distclean:
 
 test:
 	@sudo echo -n
+	go fmt ./...
 	go test -parallel 20 -exec sudo ./...
 
 $(LIBPCAP)/libpcap.a: $(LIBPCAP)/configure
