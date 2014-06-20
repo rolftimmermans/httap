@@ -31,7 +31,7 @@ func (st *Stream) Consume() {
 	buf := bufio.NewReader(st)
 
 	for {
-		req, err := http.ReadRequest(st)
+		req, err := http.ReadRequest(buf)
 		if err == io.EOF {
 			return
 		} else if err != nil {

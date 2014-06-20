@@ -14,12 +14,10 @@ type AddrError struct {
 	err error
 }
 
-func FindInterfaces() []string {
-	var intfsWithAddress []string
-
+func FindInterfaces() (intfsWithAddress []string) {
 	intfs, err := net.Interfaces()
 	if err != nil {
-		return []string{}
+		return
 	}
 
 	for _, intf := range intfs {
@@ -28,8 +26,7 @@ func FindInterfaces() []string {
 			intfsWithAddress = append(intfsWithAddress, intf.Name)
 		}
 	}
-
-	return intfsWithAddress
+	return
 }
 
 func ResolveAddrList(strs []string) (AddrList, error) {
@@ -40,47 +37,47 @@ func ResolveAddrPatterns(strs []string) (AddrList, error) {
 	return resolveAddrListOrPatterns(strs, true)
 }
 
-func resolveAddrListOrPatterns(strs []string, expand bool) (AddrList, error) {
-	var addrs AddrList
+func resolveAddrListOrPatterns(strs []string, expand bool) (addrs AddrList, err error) {
+	var str string
 
-	for _, str := range strs {
-		host, port, err := splitAddr(str)
-		if err != nil {
-			return nil, &AddrError{str, err}
+	defer func() {
+		if r := recover(); r != nil {
+			err = &AddrError{str, r.(error)}
 		}
+	}()
+
+	for _, str = range strs {
+		host, port := splitAddr(str)
 
 		if expand && host == "" {
 			ips, err := net.InterfaceAddrs()
 			if err != nil {
-				return nil, &AddrError{str, err}
+				panic(err)
 			}
 
 			for _, ip := range ips {
-				addr, err := resolveHostPort(ip.(*net.IPNet).IP.String(), port)
-				if err != nil {
-					return nil, &AddrError{str, err}
-				}
-				addrs = addrs.Add(addr)
+				addrs = addrs.AddResolved(ip.(*net.IPNet).IP.String(), port)
 			}
 		} else {
-			addr, err := resolveHostPort(host, port)
-			if err != nil {
-				return nil, &AddrError{str, err}
-			}
-			addrs = addrs.Add(addr)
+			addrs = addrs.AddResolved(host, port)
 		}
 	}
 
-	return addrs, nil
+	return
 }
 
-func (addrs AddrList) Add(new *net.TCPAddr) AddrList {
+func (addrs AddrList) AddResolved(host, port string) AddrList {
+	resolved, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(host, port))
+	if err != nil {
+		panic(err)
+	}
+
 	for _, item := range addrs {
-		if reflect.DeepEqual(new, item) {
+		if reflect.DeepEqual(resolved, item) {
 			return addrs
 		}
 	}
-	return append(addrs, new)
+	return append(addrs, resolved)
 }
 
 func (addrs AddrList) String() string {
@@ -125,27 +122,22 @@ func (e *AddrError) Error() string {
 	return fmt.Sprintf("cannot resolve %s (%s)", e.str, e.err)
 }
 
-func splitAddr(addr string) (string, string, error) {
+func splitAddr(addr string) (string, string) {
 	if !hasPort(addr) {
 		addr = addr + ":80"
 	}
 
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		return "", "", err
+		panic(err)
 	}
 
 	if host == "*" {
 		host = ""
 	}
-
-	return host, port, nil
+	return host, port
 }
 
 func hasPort(addr string) bool {
 	return strings.LastIndex(addr, ":") > strings.LastIndex(addr, "]")
-}
-
-func resolveHostPort(host, port string) (*net.TCPAddr, error) {
-	return net.ResolveTCPAddr("tcp", net.JoinHostPort(host, port))
 }
