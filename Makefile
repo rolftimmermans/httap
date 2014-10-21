@@ -25,6 +25,6 @@ $(LIBPCAP)/libpcap.a: $(LIBPCAP)/configure
 
 $(LIBPCAP)/configure:
 	git clone https://github.com/the-tcpdump-group/libpcap.git $(LIBPCAP) --quiet
-	git -C $(LIBPCAP) checkout libpcap-1.5.3 --quiet
+	cd $(LIBPCAP) && git checkout libpcap-1.5.3 --quiet
 
 .PHONY: all clean distclean test
