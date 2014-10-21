@@ -4,6 +4,8 @@ LIBPCAP = vendor/libpcap
 all: export CGO_CFLAGS  = -I$(realpath $(LIBPCAP))
 all: export CGO_LDFLAGS = -L$(realpath $(LIBPCAP))
 all: $(LIBPCAP)/libpcap.a
+	go get github.com/jessevdk/go-flags
+	go get code.google.com/p/gopacket
 	go build -a
 
 clean:
