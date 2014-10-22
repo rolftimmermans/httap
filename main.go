@@ -41,13 +41,10 @@ func reportError() {
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	sigs := make(chan os.Signal, 1)
+	/* We don't have to read from the signal channel, the signal package
+	   promises not to block while sending and the signal will be discarded. */
+	sigs := make(chan os.Signal)
 	signal.Notify(sigs, syscall.SIGHUP)
-	go func() {
-		for _ = range sigs {
-			/* Ignore SIGHUP so process continues after terminal closes. */
-		}
-	}()
 }
 
 func main() {
