@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -20,6 +21,8 @@ type Wiretap struct {
 	Destinations AddrList
 	Interfaces   []string
 	Headers      map[string]string
+	RepeatFunc   func() int
+	RepeatDelay  time.Duration
 	Logger       *log.Logger
 	Verbose      bool
 	BufSize      int32
@@ -28,10 +31,11 @@ type Wiretap struct {
 }
 
 type Options struct {
-	Sources      []string `short:"s" long:"src"     description:"Source(s) to wiretap HTTP traffic from" value-name:"HOST[:PORT]" default:"*:80" default-mask:"*:80 by default"`
-	Destinations []string `short:"d" long:"dst"     description:"Destination(s) to forward copy of HTTP traffic to" value-name:"HOST[:PORT]" required:"true"`
-	Headers      []string `short:"H" long:"header"  description:"Set or replace request header in duplicated traffic" value-name:"LINE"`
-	Verbose      bool     `short:"v" long:"verbose" description:"Show extra information, including all request headers"`
+	Sources      []string `short:"s" long:"src"      description:"Source(s) to wiretap HTTP traffic from" value-name:"HOST[:PORT]" default:"*:80" default-mask:"*:80 by default"`
+	Destinations []string `short:"d" long:"dst"      description:"Destination(s) to forward copy of HTTP traffic to" value-name:"HOST[:PORT]" required:"true"`
+	Headers      []string `short:"H" long:"header"   description:"Set or replace request header in duplicated traffic" value-name:"LINE"`
+	Multiply     float32  `short:"n" long:"multiply" description:"Increase or reduce the number of requests by a factor." value-name:"N"`
+	Verbose      bool     `short:"v" long:"verbose"  description:"Show extra information, including all request headers"`
 }
 
 func NewWiretap(opts Options) *Wiretap {
@@ -56,6 +60,8 @@ func NewWiretap(opts Options) *Wiretap {
 		Destinations: destinations,
 		Interfaces:   FindInterfaces(),
 		Headers:      headers,
+		RepeatFunc:   repeat(opts.Multiply),
+		RepeatDelay:  2 * time.Second,
 		Logger:       log.New(os.Stdout, "", log.LstdFlags),
 		Verbose:      opts.Verbose,
 		BufSize:      65535,
@@ -135,6 +141,18 @@ func (tap *Wiretap) capture(handle *pcap.Handle, channel chan gopacket.Packet) {
 			return
 		} else if err == nil {
 			channel <- packet
+		}
+	}
+}
+
+func repeat(n float32) func() int {
+	min := int(n)
+	prb := n - float32(min)
+	return func() int {
+		if rand.Float32() < prb {
+			return min + 1
+		} else {
+			return min
 		}
 	}
 }
