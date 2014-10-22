@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path"
 	"runtime"
+	"syscall"
 
 	"github.com/jessevdk/go-flags"
 	httap "github.com/rolftimmermans/httap/lib"
@@ -38,6 +40,14 @@ func reportError() {
 
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGHUP)
+	go func() {
+		for _ = range sigs {
+			/* Ignore SIGHUP so process continues after terminal closes. */
+		}
+	}()
 }
 
 func main() {
