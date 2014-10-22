@@ -12,8 +12,8 @@ import (
 
 type options struct {
 	httap.Options
-	Help    bool `long:"help"    description:"Display this help and exit"`
-	Version bool `long:"version" description:"Display version number and exit"`
+	Help    bool `long:"help"    description:"Display this help and exit."`
+	Version bool `long:"version" description:"Display version number and exit."`
 }
 
 var parser *flags.Parser

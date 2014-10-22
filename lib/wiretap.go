@@ -31,11 +31,11 @@ type Wiretap struct {
 }
 
 type Options struct {
-	Sources      []string `short:"s" long:"src"      description:"Source(s) to wiretap HTTP traffic from" value-name:"HOST[:PORT]" default:"*:80" default-mask:"*:80 by default"`
-	Destinations []string `short:"d" long:"dst"      description:"Destination(s) to forward copy of HTTP traffic to" value-name:"HOST[:PORT]" required:"true"`
-	Headers      []string `short:"H" long:"header"   description:"Set or replace request header in duplicated traffic" value-name:"LINE"`
+	Sources      []string `short:"s" long:"src"      description:"Source(s) to wiretap HTTP traffic from." value-name:"HOST[:PORT]" default:"*:80" default-mask:"*:80 by default"`
+	Destinations []string `short:"d" long:"dst"      description:"Destination(s) to forward copy of HTTP traffic to." value-name:"HOST[:PORT]" required:"true"`
+	Headers      []string `short:"H" long:"header"   description:"Set or replace request header in duplicated traffic." value-name:"LINE"`
 	Multiply     float32  `short:"n" long:"multiply" description:"Increase or reduce the number of requests by a factor." value-name:"N"`
-	Verbose      bool     `short:"v" long:"verbose"  description:"Show extra information, including all request headers"`
+	Verbose      bool     `short:"v" long:"verbose"  description:"Show extra information, including all request headers."`
 }
 
 func NewWiretap(opts Options) *Wiretap {
