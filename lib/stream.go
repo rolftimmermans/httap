@@ -54,17 +54,17 @@ func (st *Stream) forward(req *http.Request) {
 
 	st.replaceHeaders(req)
 
-	var send func(int, bool)
-	for _, dst := range st.tap.Destinations {
-		send = func(n int, repeat bool) {
-			st.send(st.copy(req, body, dst), req.URL.String(), repeat)
-			if n > 1 {
-				time.Sleep(st.tap.RepeatDelay)
-				send(n-1, true)
-			}
+	var send func(*net.TCPAddr, int, bool)
+	send = func(dst *net.TCPAddr, n int, repeat bool) {
+		st.send(st.copy(req, body, dst), req.URL.String(), repeat)
+		if n > 1 {
+			time.Sleep(st.tap.RepeatDelay)
+			send(dst, n-1, true)
 		}
+	}
 
-		go send(st.tap.RepeatFunc(), false)
+	for _, dst := range st.tap.Destinations {
+		go send(dst, st.tap.RepeatFunc(), false)
 	}
 }
 
