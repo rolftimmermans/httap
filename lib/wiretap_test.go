@@ -39,6 +39,18 @@ func TestStartWiretap(t *testing.T) {
 	assert.Equal(t, copy.Host, orig.Host)
 }
 
+func TestStartWiretapMultipliesRequest(t *testing.T) {
+	orig, copies := performMultipliedHttpWiretap(Options{Multiply: 2.0}, nil)
+
+	assert.Equal(t, copies[0].URL.String(), orig.URL.String())
+	assert.Equal(t, copies[0].Header, orig.Header)
+	assert.Equal(t, copies[0].Host, orig.Host)
+
+	assert.Equal(t, copies[1].URL.String(), orig.URL.String())
+	assert.Equal(t, copies[1].Header, orig.Header)
+	assert.Equal(t, copies[1].Host, orig.Host)
+}
+
 func TestStartWiretapReplacesHost(t *testing.T) {
 	orig, copy := performHttpWiretap(Options{Headers: []string{"Host: example.com"}}, nil)
 
@@ -71,7 +83,7 @@ func TestStartWiretapForwardsBodyAfterHttpContinue(t *testing.T) {
 	assert.Equal(t, string(copy.consumedBody), "FOO BAR BAZ")
 }
 
-func createHttpChannel() (string, chan requestInfo) {
+func createHttpChannel(n int) (string, chan requestInfo) {
 	channel := make(chan requestInfo)
 
 	listener, err := net.Listen("tcp", "localhost:0")
@@ -79,10 +91,14 @@ func createHttpChannel() (string, chan requestInfo) {
 		panic(err)
 	}
 
+	i := 0
 	handler := func(writer http.ResponseWriter, req *http.Request) {
 		body, _ := ioutil.ReadAll(req.Body)
 		channel <- requestInfo{req, body}
-		defer listener.Close()
+		i++
+		if i == n {
+			defer listener.Close()
+		}
 	}
 
 	go http.Serve(listener, http.HandlerFunc(handler))
@@ -90,19 +106,25 @@ func createHttpChannel() (string, chan requestInfo) {
 	return listener.Addr().String(), channel
 }
 
-func performHttpWiretap(opts Options, callback func(string)) (requestInfo, requestInfo) {
+func performMultipliedHttpWiretap(opts Options, callback func(string)) (requestInfo, []requestInfo) {
+	n := int(opts.Multiply)
+	if n == 0 {
+		n = 1
+	}
+
 	if callback == nil {
 		callback = func(host string) {
 			http.Get(host)
 		}
 	}
 
-	tstHost, tstReqs := createHttpChannel()
-	prdHost, prdReqs := createHttpChannel()
+	tstHost, tstReqs := createHttpChannel(n)
+	prdHost, prdReqs := createHttpChannel(1)
 
 	opts.Sources = []string{prdHost}
 	opts.Destinations = []string{tstHost}
 	wiretap := NewWiretap(opts)
+	wiretap.RepeatDelay = 0
 
 	go wiretap.Start()
 
@@ -111,7 +133,15 @@ func performHttpWiretap(opts Options, callback func(string)) (requestInfo, reque
 	go callback("http://" + prdHost)
 
 	orig := <-prdReqs
-	copy := <-tstReqs
+	copy := make([]requestInfo, n)
+	for i := 0; i < n; i++ {
+		copy[i] = <-tstReqs
+	}
 
 	return orig, copy
+}
+
+func performHttpWiretap(opts Options, callback func(string)) (requestInfo, requestInfo) {
+	orig, copy := performMultipliedHttpWiretap(opts, callback)
+	return orig, copy[0]
 }

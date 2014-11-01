@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -54,17 +55,15 @@ func (st *Stream) forward(req *http.Request) {
 
 	st.replaceHeaders(req)
 
-	var send func(*net.TCPAddr, int, bool)
-	send = func(dst *net.TCPAddr, n int, repeat bool) {
-		st.send(st.copy(req, body, dst), req.URL.String(), repeat)
-		if n > 1 {
-			time.Sleep(st.tap.RepeatDelay)
-			send(dst, n-1, true)
-		}
-	}
-
 	for _, dst := range st.tap.Destinations {
-		go send(dst, st.tap.RepeatFunc(), false)
+		n := st.forwardCount()
+		for i := 0; i < n; i++ {
+			copy := st.copy(req, body, dst)
+			repeat := i > 0
+			time.AfterFunc(time.Duration(i)*st.tap.RepeatDelay, func() {
+				st.send(copy, req.URL.String(), repeat)
+			})
+		}
 	}
 }
 
@@ -124,4 +123,14 @@ func (st *Stream) copy(req *http.Request, body *bytes.Buffer, dst *net.TCPAddr) 
 	copy.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
 
 	return &copy
+}
+
+func (st *Stream) forwardCount() int {
+	min := int(st.tap.Multiply)
+	prb := st.tap.Multiply - float32(min)
+	if rand.Float32() < prb {
+		return min + 1
+	} else {
+		return min
+	}
 }

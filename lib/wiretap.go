@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -21,7 +20,7 @@ type Wiretap struct {
 	Destinations AddrList
 	Interfaces   []string
 	Headers      map[string]string
-	RepeatFunc   func() int
+	Multiply     float32
 	RepeatDelay  time.Duration
 	Logger       *log.Logger
 	Verbose      bool
@@ -55,12 +54,16 @@ func NewWiretap(opts Options) *Wiretap {
 		headers[strings.ToLower(parts[0])] = strings.TrimLeft(parts[1], " ")
 	}
 
+	if opts.Multiply == 0 {
+		opts.Multiply = 1
+	}
+
 	return &Wiretap{
 		Sources:      sources,
 		Destinations: destinations,
 		Interfaces:   FindInterfaces(),
 		Headers:      headers,
-		RepeatFunc:   repeat(opts.Multiply),
+		Multiply:     opts.Multiply,
 		RepeatDelay:  2 * time.Second,
 		Logger:       log.New(os.Stdout, "", log.LstdFlags),
 		Verbose:      opts.Verbose,
@@ -141,18 +144,6 @@ func (tap *Wiretap) capture(handle *pcap.Handle, channel chan gopacket.Packet) {
 			return
 		} else if err == nil {
 			channel <- packet
-		}
-	}
-}
-
-func repeat(n float32) func() int {
-	min := int(n)
-	prb := n - float32(min)
-	return func() int {
-		if rand.Float32() < prb {
-			return min + 1
-		} else {
-			return min
 		}
 	}
 }
