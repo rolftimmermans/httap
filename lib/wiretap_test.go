@@ -83,6 +83,17 @@ func TestStartWiretapForwardsBodyAfterHttpContinue(t *testing.T) {
 	assert.Equal(t, string(copy.consumedBody), "FOO BAR BAZ")
 }
 
+func TestStartWiretapFiltersHttpVerb(t *testing.T) {
+	orig, copy := performHttpWiretap(Options{Methods: []string{"GET"}}, func(host string) {
+		http.Post(host, "text/plain", strings.NewReader(""))
+		http.Get(host)
+	})
+
+	assert.Equal(t, copy.URL.String(), orig.URL.String())
+	assert.Equal(t, copy.Host, orig.Host)
+	assert.Equal(t, copy.Method, "GET")
+}
+
 func createHttpChannel(n int) (string, chan requestInfo) {
 	channel := make(chan requestInfo)
 

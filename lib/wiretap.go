@@ -20,6 +20,7 @@ type Wiretap struct {
 	Destinations AddrList
 	Interfaces   []string
 	Headers      map[string]string
+	Methods      map[string]bool
 	Multiply     float32
 	RepeatDelay  time.Duration
 	Logger       *log.Logger
@@ -33,6 +34,7 @@ type Options struct {
 	Sources      []string `short:"s" long:"src"      description:"Source(s) to wiretap HTTP traffic from." value-name:"HOST[:PORT]" default:"*:80" default-mask:"*:80 by default"`
 	Destinations []string `short:"d" long:"dst"      description:"Destination(s) to forward copy of HTTP traffic to." value-name:"HOST[:PORT]" required:"true"`
 	Headers      []string `short:"H" long:"header"   description:"Set or replace request header in duplicated traffic." value-name:"LINE"`
+	Methods      []string `short:"m" long:"method"   description:"Only forward requests with specific HTTP methods." value-name:"VERB"`
 	Multiply     float32  `short:"n" long:"multiply" description:"Increase or reduce the number of requests by a factor." value-name:"N"`
 	Verbose      bool     `short:"v" long:"verbose"  description:"Show extra information, including all request headers."`
 }
@@ -54,6 +56,11 @@ func NewWiretap(opts Options) *Wiretap {
 		headers[strings.ToLower(parts[0])] = strings.TrimLeft(parts[1], " ")
 	}
 
+	methods := make(map[string]bool)
+	for _, method := range opts.Methods {
+		methods[strings.ToUpper(method)] = true
+	}
+
 	if opts.Multiply == 0 {
 		opts.Multiply = 1
 	}
@@ -63,6 +70,7 @@ func NewWiretap(opts Options) *Wiretap {
 		Destinations: destinations,
 		Interfaces:   FindInterfaces(),
 		Headers:      headers,
+		Methods:      methods,
 		Multiply:     opts.Multiply,
 		RepeatDelay:  2 * time.Second,
 		Logger:       log.New(os.Stdout, "", log.LstdFlags),

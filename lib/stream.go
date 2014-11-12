@@ -48,6 +48,10 @@ func (st *Stream) forward(req *http.Request) {
 	req.URL.Scheme = "http"
 	req.URL.Host = req.Host
 
+	if len(st.tap.Methods) > 0 && !st.tap.Methods[req.Method] {
+		return
+	}
+
 	body := new(bytes.Buffer)
 	if _, err := io.Copy(body, req.Body); err != nil {
 		st.tap.Log("Error: %s", err)
