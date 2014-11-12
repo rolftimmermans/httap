@@ -116,17 +116,25 @@ func (tap *Wiretap) packets() chan gopacket.Packet {
 	channel := make(chan gopacket.Packet, 100)
 	filter := tap.Sources.Filter()
 
+	n := 0
 	for _, intf := range tap.Interfaces {
 		handle, err := pcap.OpenLive(intf, tap.BufSize, tap.Sources.RequiresPromisc(), tap.Timeout)
 		if err != nil {
-			panic(err)
+			fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+			continue
 		}
 
 		if err := handle.SetBPFFilter(filter); err != nil {
-			panic(err)
+			fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+			continue
 		}
 
+		n++
 		go tap.capture(handle, channel)
+	}
+
+	if n == 0 {
+		panic("no devices could be wiretapped")
 	}
 
 	return channel

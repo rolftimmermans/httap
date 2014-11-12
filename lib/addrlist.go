@@ -22,7 +22,9 @@ func FindInterfaces() (intfsWithAddress []string) {
 
 	for _, intf := range intfs {
 		addrs, err := intf.Addrs()
-		if err == nil && len(addrs) > 0 {
+
+		/* VMWare interfaces are not supported by libpcap. */
+		if err == nil && len(addrs) > 0 && !strings.HasPrefix(intf.Name, "vmnet") {
 			intfsWithAddress = append(intfsWithAddress, intf.Name)
 		}
 	}
