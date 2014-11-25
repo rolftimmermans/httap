@@ -19,11 +19,13 @@ type options struct {
 }
 
 var parser *flags.Parser
+var buildTag string
 
 func writeVersion() {
 	cliName := path.Base(os.Args[0])
-	cliVersion := "0.1"
-	fmt.Fprintf(os.Stderr, "%s version %s (%s, %s)\n", cliName, cliVersion, httap.PcapVersion(), runtime.Version())
+	cliVersion := "0.2"
+	fmt.Fprintf(os.Stderr, "%s version %s-%s (%s, %s)\n", cliName, cliVersion, buildTag,
+		httap.PcapVersion(), runtime.Version())
 }
 
 func writeHelp() {

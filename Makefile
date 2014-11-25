@@ -1,12 +1,13 @@
 TARGET = httap
 LIBPCAP = vendor/libpcap
+DATE = $(shell date +%Y%m%d)
 
 all: export CGO_CFLAGS  = -I$(realpath $(LIBPCAP))
 all: export CGO_LDFLAGS = -L$(realpath $(LIBPCAP))
 all: $(LIBPCAP)/libpcap.a
 	go get github.com/jessevdk/go-flags
 	go get code.google.com/p/gopacket
-	go build -a
+	go build -a -ldflags "-X main.buildTag $(DATE)"
 
 clean:
 	go clean
