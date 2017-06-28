@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"syscall"
 
+	httap "./lib"
 	"github.com/jessevdk/go-flags"
-	httap "github.com/rolftimmermans/httap/lib"
 )
 
 type options struct {

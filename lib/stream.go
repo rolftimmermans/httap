@@ -11,8 +11,8 @@ import (
 	"os"
 	"time"
 
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/tcpassembly/tcpreader"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/tcpassembly/tcpreader"
 )
 
 type Stream struct {
